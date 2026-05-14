@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>法语发音助手</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f9; color: #333; }
+        .container { display: flex; flex-direction: column; height: 100vh; max-width: 800px; margin: 0 auto; }
+        
+        /* 顶部输入与播放区 */
+        .main-section { padding: 20px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
+        textarea { width: 100%; height: 80px; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
+        .btn-generate { width: 100%; padding: 15px; font-size: 18px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-generate:disabled { background-color: #aaa; }
+        
+        /* 播放器控制区 */
+        .player-box { margin-top: 20px; text-align: center; display: none; }
+        .current-text { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #007bff; }
+        .controls { display: flex; justify-content: center; align-items: center; gap: 15px; }
+        .btn-play { width: 80px; height: 80px; border-radius: 50%; background-color: #28a745; color: white; border: none; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .btn-speed { width: 50px; height: 50px; border-radius: 50%; background-color: #6c757d; color: white; border: none; font-size: 16px; cursor: pointer; }
+        .speed-display { font-size: 16px; font-weight: bold; min-width: 50px; }
+
+        /* 历史记录区 */
+        .history-section { flex: 1; overflow-y: auto; padding: 20px; }
+        h3 { margin-top: 0; }
+        .history-item { background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid transparent; }
+        .history-item.active { border-left-color: #007bff; background: #eef6ff; }
+        .history-text { font-size: 16px; margin-bottom: 5px; }
+        .history-time { font-size: 12px; color: #888; }
+        
+        @media (min-width: 768px) {
+            .container { flex-direction: row; }
+            .main-section { width: 50%; height: 100vh; overflow-y: auto; border-right: 1px solid #ddd; }
+            .history-section { width: 50%; height: 100vh; overflow-y: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="main-section">
+        <h2>🇫🇷 法语生成器</h2>
+        <textarea id="textInput" placeholder="输入法语内容..."></textarea>
+        <button id="generateBtn" class="btn-generate" onclick="generateAudio()">生成语音</button>
+
+        <div id="playerBox" class="player-box">
+            <div id="currentText" class="current-text"></div>
+            <audio id="audioPlayer" onended="playEnded()"></audio>
+            <div class="controls">
+                <button class="btn-speed" onclick="changeSpeed(-0.05)">-5%</button>
+                <button id="playBtn" class="btn-play" onclick="togglePlay()">播放</button>
+                <button class="btn-speed" onclick="changeSpeed(0.05)">+5%</button>
+            </div>
+            <div style="margin-top: 10px;"><span class="speed-display" id="speedDisplay">当前语速: 1.00x</span></div>
+        </div>
+    </div>
+
+    <div class="history-section">
+        <h3>📜 历史记录</h3>
+        <div id="historyList"></div>
+    </div>
+</div>
+
+<script>
+    let currentAudioUrl = "";
+    let playbackRate = 1.0;
+    const audioPlayer = document.getElementById("audioPlayer");
+    const playBtn = document.getElementById("playBtn");
+
+    // 页面加载时获取历史记录
+    window.onload = loadHistory;
+
+    async function generateAudio() {
+        const text = document.getElementById("textInput").value.trim();
+        if (!text) { alert("请输入内容"); return; }
+
+        const btn = document.getElementById("generateBtn");
+        btn.disabled = true;
+        btn.innerText = "生成中...";
+
+        try {
+            const res = await fetch('/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await res.json();
+            
+            if (data.error) throw new Error(data.error);
+
+            document.getElementById("textInput").value = ""; // 清空输入框
+            loadAudio(data.text, data.url);
+            loadHistory(); // 刷新历史
+        } catch (e) {
+            alert("生成失败: " + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "生成语音";
+        }
+    }
+
+    function loadAudio(text, url) {
+        document.getElementById("playerBox").style.display = "block";
+        document.getElementById("currentText").innerText = text;
+        currentAudioUrl = url;
+        audioPlayer.src = url;
+        audioPlayer.playbackRate = playbackRate;
+        
+        // 自动播放
+        playBtn.innerText = "暂停";
+        audioPlayer.play();
+    }
+
+    function togglePlay() {
+        if (!audioPlayer.src) return;
+        if (audioPlayer.paused) {
+            audioPlayer.play();
+            playBtn.innerText = "暂停";
+        } else {
+            audioPlayer.pause();
+            playBtn.innerText = "播放";
+        }
+    }
+
+    function playEnded() {
+        playBtn.innerText = "播放";
+    }
+
+    function changeSpeed(delta) {
+        playbackRate += delta;
+        if (playbackRate < 0.5) playbackRate = 0.5;
+        if (playbackRate > 2.0) playbackRate = 2.0;
+        
+        audioPlayer.playbackRate = playbackRate;
+        document.getElementById("speedDisplay").innerText = "当前语速: " + playbackRate.toFixed(2) + "x";
+    }
+
+    async function loadHistory() {
+        const res = await fetch('/history');
+        const data = await res.json();
+        
+        const listDiv = document.getElementById("historyList");
+        listDiv.innerHTML = "";
+        
+        data.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "history-item";
+            div.innerHTML = `
+                <div class="history-text">${item.text}</div>
+                <div class="history-time">${item.created_at}</div>
+            `;
+            div.onclick = () => loadAudio(item.text, item.url);
+            listDiv.appendChild(div);
+        });
+    }
+</script>
+</body>
+</html>
