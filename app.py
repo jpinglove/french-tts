@@ -101,8 +101,10 @@ def generate():
 def get_history():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    # 按时间倒序排列
-    cursor.execute('SELECT id, text, filename, created_at FROM history ORDER BY id DESC LIMIT 50')
+    # 移除 LIMIT，返回所有数据以便前端精确统计和搜索
+    cursor.execute('SELECT id, text, filename, created_at FROM history ORDER BY id DESC')
+	# cursor.execute('SELECT id, text, filename, created_at FROM history ORDER BY id DESC LIMIT 50')
+
     rows = cursor.fetchall()
     conn.close()
     
@@ -116,6 +118,33 @@ def get_history():
         })
     return jsonify(history_list)
 
+# ================= 新增：删除接口 =================
+@app.route('/history/<int:record_id>', methods=['DELETE'])
+def delete_history(record_id):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 1. 查询对应的音频文件名
+        cursor.execute('SELECT filename FROM history WHERE id = ?', (record_id,))
+        row = cursor.fetchone()
+        
+        if row:
+            filename = row[0]
+            filepath = os.path.join(AUDIO_DIR, filename)
+            
+            # 2. 如果服务器上存在该文件，则物理删除
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            
+            # 3. 从数据库中删除该记录
+            cursor.execute('DELETE FROM history WHERE id = ?', (record_id,))
+            conn.commit()
+            
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-    

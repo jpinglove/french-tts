@@ -16,24 +16,36 @@
         
         /* 播放器控制区 */
         .player-box { margin-top: 20px; text-align: center; display: none; }
-        .current-text { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #007bff; }
+        .current-text { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #007bff; word-break: break-all; }
         .controls { display: flex; justify-content: center; align-items: center; gap: 15px; }
         .btn-play { width: 80px; height: 80px; border-radius: 50%; background-color: #28a745; color: white; border: none; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .btn-speed { width: 50px; height: 50px; border-radius: 50%; background-color: #6c757d; color: white; border: none; font-size: 16px; cursor: pointer; }
         .speed-display { font-size: 16px; font-weight: bold; min-width: 50px; }
 
-        /* 历史记录区 */
-        .history-section { flex: 1; overflow-y: auto; padding: 20px; }
-        h3 { margin-top: 0; }
-        .history-item { background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.05); cursor: pointer; border-left: 5px solid transparent; }
-        .history-item.active { border-left-color: #007bff; background: #eef6ff; }
-        .history-text { font-size: 16px; margin-bottom: 5px; }
+        .history-section { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+        
+        /* 标题和搜索框布局 */
+        .history-header { display: flex; align-items: center; margin-bottom: 10px; }
+        .history-header h3 { margin: 0; font-size: 18px; }
+        .history-count { color: #007bff; font-weight: bold; margin-left: 8px; font-size: 16px; }
+        .search-box { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; margin-bottom: 15px; }
+        
+        /* 列表滚动区 */
+        .history-list-container { flex: 1; overflow-y: auto; padding-right: 5px; }
+
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 5px rgba(0,0,0,0.05); }
+        .history-content { flex: 1; cursor: pointer; border-left: 5px solid transparent; padding-left: 5px; }
+        .history-content:hover { border-left-color: #007bff; }
+        .history-text { font-size: 16px; margin-bottom: 5px; word-break: break-word; }
         .history-time { font-size: 12px; color: #888; }
+        
+        .delete-btn { font-size: 16px; color: #dc3545; cursor: pointer; padding: 10px; margin-left: 10px; border-radius: 5px; user-select: none; }
+        .delete-btn:hover { background-color: #ffe6e6; }
         
         @media (min-width: 768px) {
             .container { flex-direction: row; }
             .main-section { width: 50%; height: 100vh; overflow-y: auto; border-right: 1px solid #ddd; }
-            .history-section { width: 50%; height: 100vh; overflow-y: auto; }
+            .history-section { width: 50%; height: 100vh; }
         }
     </style>
 </head>
@@ -58,14 +70,21 @@
     </div>
 
     <div class="history-section">
-        <h3>📜 历史记录</h3>
-        <div id="historyList"></div>
+        <div class="history-header">
+            <h3>📜 历史记录</h3>
+            <span id="historyCount" class="history-count">(0)</span>
+        </div>
+        <input type="text" id="searchInput" class="search-box" placeholder="搜索已生成的法语..." oninput="filterHistory()">
+        
+        <div id="historyList" class="history-list-container"></div>
     </div>
 </div>
 
 <script>
     let currentAudioUrl = "";
     let playbackRate = 1.0;
+    let allHistoryData = []; // 存储所有历史记录的数组
+
     const audioPlayer = document.getElementById("audioPlayer");
     const playBtn = document.getElementById("playBtn");
 
@@ -87,12 +106,13 @@
                 body: JSON.stringify({ text: text })
             });
             const data = await res.json();
-            
             if (data.error) throw new Error(data.error);
 
             document.getElementById("textInput").value = ""; // 清空输入框
             loadAudio(data.text, data.url);
-            loadHistory(); // 刷新历史
+            
+            // 生成成功后重新加载历史记录，数量会自动 +1
+            loadHistory(); 
         } catch (e) {
             alert("生成失败: " + e.message);
         } finally {
@@ -137,22 +157,90 @@
         document.getElementById("speedDisplay").innerText = "当前语速: " + playbackRate.toFixed(2) + "x";
     }
 
+    // ====== 新增：删除功能 ======
+    async function deleteRecord(id, event) {
+        // 防止点击删除时触发父级容器的播放事件
+        event.stopPropagation();
+        
+        const isConfirmed = confirm("确定要删除这条法语记录和音频文件吗？");
+        if (!isConfirmed) return; // 如果选了“否”，什么也不做
+
+        try {
+            const res = await fetch(`/history/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                // 删除成功后重新加载，数量会自动 -1
+                loadHistory();
+            } else {
+                alert("删除失败: " + data.error);
+            }
+        } catch(e) {
+            alert("网络错误: " + e.message);
+        }
+    }
+
+    // ====== 获取历史数据并初始化 ======
     async function loadHistory() {
         const res = await fetch('/history');
-        const data = await res.json();
+        allHistoryData = await res.json();
         
+        // 更新界面的总数量角标
+        document.getElementById("historyCount").innerText = `(${allHistoryData.length})`;
+        
+        // 获取完数据后，执行一次过滤渲染（如果搜索框有字，会保留过滤状态）
+        filterHistory();
+    }
+
+    // ====== 智能法语搜索过滤 ======
+    function filterHistory() {
+        const inputStr = document.getElementById("searchInput").value;
+        const keyword = removeAccents(inputStr.toLowerCase()); // 忽略大小写和音符
+        
+        const filteredData = allHistoryData.filter(item => {
+            const cleanText = removeAccents(item.text.toLowerCase());
+            return cleanText.includes(keyword);
+        });
+        
+        renderHistoryList(filteredData);
+    }
+
+    // 辅助函数：去除法语字母的音符（如 ç->c, é->e, à->a），提升模糊搜索体验
+    function removeAccents(str) {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    // ====== 渲染列表 DOM ======
+    function renderHistoryList(data) {
         const listDiv = document.getElementById("historyList");
         listDiv.innerHTML = "";
         
+        if(data.length === 0) {
+            listDiv.innerHTML = "<div style='color:#888; text-align:center; padding:20px;'>没有找到记录</div>";
+            return;
+        }
+        
         data.forEach(item => {
-            const div = document.createElement("div");
-            div.className = "history-item";
-            div.innerHTML = `
+            const wrapperDiv = document.createElement("div");
+            wrapperDiv.className = "history-item";
+            
+            // 左侧内容区：负责展示文字和点击播放
+            const contentDiv = document.createElement("div");
+            contentDiv.className = "history-content";
+            contentDiv.innerHTML = `
                 <div class="history-text">${item.text}</div>
                 <div class="history-time">${item.created_at}</div>
             `;
-            div.onclick = () => loadAudio(item.text, item.url);
-            listDiv.appendChild(div);
+            contentDiv.onclick = () => loadAudio(item.text, item.url);
+            
+            // 右侧按钮区：只负责删除
+            const delBtn = document.createElement("div");
+            delBtn.className = "delete-btn";
+            delBtn.innerText = "❌";
+            delBtn.onclick = (e) => deleteRecord(item.id, e);
+            
+            wrapperDiv.appendChild(contentDiv);
+            wrapperDiv.appendChild(delBtn);
+            listDiv.appendChild(wrapperDiv);
         });
     }
 </script>
