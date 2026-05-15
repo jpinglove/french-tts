@@ -16,11 +16,21 @@
         
         /* 播放器控制区 */
         .player-box { margin-top: 20px; text-align: center; display: none; }
-        .current-text { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #007bff; word-break: break-all; }
+        .current-text { font-size: 18px; font-weight: bold; margin-bottom: 5px; color: #007bff; word-break: break-all; }
+        
+        /* 新增：YouGlish 跳转小链接样式 */
+        .youglish-link { font-size: 13px; color: #6c757d; text-decoration: none; display: inline-block; margin-bottom: 15px; border: 1px solid #dee2e6; padding: 3px 8px; border-radius: 12px; background: #f8f9fa; }
+        .youglish-link:hover { color: #007bff; border-color: #007bff; background: #e9ecef; }
+        
         .controls { display: flex; justify-content: center; align-items: center; gap: 15px; }
         .btn-play { width: 80px; height: 80px; border-radius: 50%; background-color: #28a745; color: white; border: none; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         .btn-speed { width: 50px; height: 50px; border-radius: 50%; background-color: #6c757d; color: white; border: none; font-size: 16px; cursor: pointer; }
+        
+        /* 语速显示区调整 */
         .speed-display { font-size: 16px; font-weight: bold; min-width: 50px; }
+        /* 新增：重置语速小按钮样式 */
+        .reset-speed-btn { background: none; border: none; color: #007bff; font-size: 14px; cursor: pointer; padding: 0 0 0 10px; outline: none; }
+        .reset-speed-btn:hover { text-decoration: underline; }
 
         .history-section { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
         
@@ -59,13 +69,21 @@
 
         <div id="playerBox" class="player-box">
             <div id="currentText" class="current-text"></div>
+            <!-- 新增：YouGlish 导航链接 -->
+            <a id="youglishBtn" class="youglish-link" href="#" target="_blank">🎬 去 YouGlish 听原生视频发音</a>
+            
             <audio id="audioPlayer" onended="playEnded()"></audio>
             <div class="controls">
                 <button class="btn-speed" onclick="changeSpeed(-0.05)">-5%</button>
                 <button id="playBtn" class="btn-play" onclick="togglePlay()">播放</button>
                 <button class="btn-speed" onclick="changeSpeed(0.05)">+5%</button>
             </div>
-            <div style="margin-top: 10px;"><span class="speed-display" id="speedDisplay">当前语速: 1.00x</span></div>
+            
+            <div style="margin-top: 15px;">
+                <span class="speed-display" id="speedDisplay">当前语速: 1.00x</span>
+                <!-- 新增：重置语速按钮 -->
+                <button class="reset-speed-btn" onclick="resetSpeed()">↺ 重置</button>
+            </div>
         </div>
     </div>
 
@@ -124,6 +142,15 @@
     function loadAudio(text, url) {
         document.getElementById("playerBox").style.display = "block";
         document.getElementById("currentText").innerText = text;
+        
+        // ====== 新增：拼接 YouGlish 链接 ======
+        // 1. 将句子中的空格替换为下划线 _
+        let youglishText = text.replace(/\s+/g, '_');
+        // 2. 对带有法语拼写符号的内容进行 URL 编码
+        let encodedText = encodeURIComponent(youglishText);
+        // 3. 赋值给 a 标签
+        document.getElementById("youglishBtn").href = `https://youglish.com/pronounce/${encodedText}/french`;
+        
         currentAudioUrl = url;
         audioPlayer.src = url;
         audioPlayer.playbackRate = playbackRate;
@@ -156,8 +183,14 @@
         audioPlayer.playbackRate = playbackRate;
         document.getElementById("speedDisplay").innerText = "当前语速: " + playbackRate.toFixed(2) + "x";
     }
+    
+    // ====== 新增：重置语速函数 ======
+    function resetSpeed() {
+        playbackRate = 1.0;
+        audioPlayer.playbackRate = playbackRate;
+        document.getElementById("speedDisplay").innerText = "当前语速: 1.00x";
+    }
 
-    // ====== 新增：删除功能 ======
     async function deleteRecord(id, event) {
         // 防止点击删除时触发父级容器的播放事件
         event.stopPropagation();
