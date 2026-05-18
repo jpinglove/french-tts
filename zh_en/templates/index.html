@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中英极速翻译</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; color: #333; }
+        .container { display: flex; flex-direction: column; height: 100vh; max-width: 900px; margin: 0 auto; }
+        
+        /* 左侧/上方主功能区 */
+        .main-section { padding: 20px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; display: flex; flex-direction: column; }
+        h2 { margin-top: 0; color: #1a73e8; }
+        
+        /* 输入框支持垂直拖拽调整大小 */
+        textarea { width: 100%; min-height: 100px; padding: 12px; font-size: 16px; border: 1px solid #dadce0; border-radius: 8px; box-sizing: border-box; resize: vertical; margin-bottom: 15px; outline: none; }
+        textarea:focus { border-color: #1a73e8; box-shadow: 0 0 5px rgba(26,115,232,0.3); }
+        
+        .btn-translate { width: 100%; padding: 15px; font-size: 18px; background-color: #1a73e8; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: background 0.3s; }
+        .btn-translate:hover { background-color: #1557b0; }
+        .btn-translate:disabled { background-color: #a0c1f5; cursor: not-allowed; }
+
+        /* 翻译结果展示区 */
+        .result-box { margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 5px solid #1a73e8; display: none; }
+        .result-box.active { display: block; }
+        .zh-display { font-size: 15px; color: #5f6368; margin-bottom: 12px; white-space: pre-wrap; word-break: break-word; }
+        .en-display { font-size: 20px; color: #202124; font-weight: bold; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+        /* 右侧/下方历史记录区 */
+        .history-section { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+        .history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+        .history-header h3 { margin: 0; font-size: 18px; color: #444; }
+        .history-count { color: #1a73e8; font-weight: bold; font-size: 16px; }
+        
+        .history-list-container { flex: 1; overflow-y: auto; padding-right: 5px; }
+        
+        .history-item { display: flex; justify-content: space-between; align-items: center; background: #fff; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        /* 核心修复 1：min-width: 0 阻止文字撑爆弹性容器 */
+        .history-content { flex: 1; min-width: 0; padding: 12px 15px; cursor: pointer; border-left: 4px solid transparent; }
+        .history-content:hover { background-color: #f1f3f4; border-left-color: #1a73e8; }
+        
+        /* 核心修复 2：允许文字自然换行，从而增加容器高度 */
+        .history-text-zh { font-size: 15px; color: #333; margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; }
+        .history-text-en { font-size: 13px; color: #1a73e8; white-space: pre-wrap; word-break: break-word; }
+        
+        /* 核心修复 3：flex-shrink: 0 绝对禁止按钮缩小 */
+        .delete-btn { width: 50px; flex-shrink: 0; flex-grow: 0; display: flex; align-items: center; justify-content: center; background-color: #fff; color: #dc3545; cursor: pointer; font-size: 18px; user-select: none; border-left: 1px solid #f0f0f0; transition: background 0.2s; }
+        .delete-btn:hover { background-color: #ffe6e6; }
+
+        @media (min-width: 768px) {
+            .container { flex-direction: row; }
+            .main-section { width: 55%; height: 100vh; overflow-y: auto; border-right: 1px solid #ddd; }
+            .history-section { width: 45%; height: 100vh; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="main-section">
+        <h2>🌏 中英极速翻译</h2>
+        <!-- 文本域：右下角可拖拽 -->
+        <textarea id="textInput" placeholder="请输入要翻译的中文 (支持多行回车)..."></textarea>
+        <button id="translateBtn" class="btn-translate" onclick="doTranslate()">翻译成英文</button>
+
+        <!-- 结果展示区 -->
+        <div id="resultBox" class="result-box">
+            <div id="zhDisplay" class="zh-display"></div>
+            <div id="enDisplay" class="en-display"></div>
+        </div>
+    </div>
+
+    <div class="history-section">
+        <div class="history-header">
+            <h3>📜 翻译历史</h3>
+            <span id="historyCount" class="history-count">0 条记录</span>
+        </div>
+        <div id="historyList" class="history-list-container"></div>
+    </div>
+</div>
+
+<script>
+    window.onload = loadHistory;
+
+    async function doTranslate() {
+        const text = document.getElementById("textInput").value.trim();
+        if (!text) { alert("请输入需要翻译的内容"); return; }
+
+        const btn = document.getElementById("translateBtn");
+        btn.disabled = true;
+        btn.innerText = "翻译中...";
+
+        try {
+            const res = await fetch('/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await res.json();
+            
+            if (data.error) throw new Error(data.error);
+
+            // 清空输入框并展示结果
+            document.getElementById("textInput").value = "";
+            showResult(data.zh_text, data.en_text);
+            
+            // 刷新历史记录
+            loadHistory();
+        } catch (e) {
+            alert("翻译失败: " + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "翻译成英文";
+        }
+    }
+
+    // 在页面左下角展示中英对照（查看历史时也会复用此函数）
+    function showResult(zhText, enText) {
+        document.getElementById("resultBox").classList.add("active");
+        document.getElementById("zhDisplay").innerText = zhText;
+        document.getElementById("enDisplay").innerText = enText;
+    }
+
+    async function deleteRecord(id, event) {
+        event.stopPropagation(); // 阻止点击事件冒泡触发查看详情
+        
+        if (!confirm("确定要删除这条翻译记录吗？")) return;
+
+        try {
+            const res = await fetch(`/history/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                loadHistory();
+            } else {
+                alert("删除失败: " + data.error);
+            }
+        } catch(e) {
+            alert("网络错误: " + e.message);
+        }
+    }
+
+    async function loadHistory() {
+        const res = await fetch('/history');
+        const data = await res.json();
+        
+        document.getElementById("historyCount").innerText = `${data.length} 条记录`;
+        const listDiv = document.getElementById("historyList");
+        listDiv.innerHTML = "";
+        
+        if(data.length === 0) {
+            listDiv.innerHTML = "<div style='color:#888; text-align:center; padding:20px; font-size:14px;'>暂无历史记录</div>";
+            return;
+        }
+        
+        data.forEach(item => {
+            const wrapperDiv = document.createElement("div");
+            wrapperDiv.className = "history-item";
+            
+            // 左侧：显示部分文字，点击展示详情
+            const contentDiv = document.createElement("div");
+            contentDiv.className = "history-content";
+            contentDiv.innerHTML = `
+                <div class="history-text-zh">${item.zh_text}</div>
+                <div class="history-text-en">${item.en_text}</div>
+            `;
+            // 点击历史记录时，直接在左侧展示区显示双语
+            contentDiv.onclick = () => showResult(item.zh_text, item.en_text);
+            
+            // 右侧：删除按钮
+            const delBtn = document.createElement("div");
+            delBtn.className = "delete-btn";
+            delBtn.innerText = "🗑️";
+            delBtn.onclick = (e) => deleteRecord(item.id, e);
+            
+            wrapperDiv.appendChild(contentDiv);
+            wrapperDiv.appendChild(delBtn);
+            listDiv.appendChild(wrapperDiv);
+        });
+    }
+</script>
+</body>
+</html>
