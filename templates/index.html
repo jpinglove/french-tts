@@ -13,6 +13,10 @@
         textarea { width: 100%; height: 80px; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
         .btn-generate { width: 100%; padding: 15px; font-size: 18px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .btn-generate:disabled { background-color: #aaa; }
+        .btn-row { display: flex; gap: 8px; }
+        .btn-row .btn-generate { flex: 1; width: auto; }
+        .btn-forvo { width: 20%; min-width: 70px; padding: 15px 5px; font-size: 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; white-space: nowrap; }
+        .btn-forvo:hover { background-color: #5a6268; }
         
         /* 播放器控制区 */
         .player-box { margin-top: 20px; text-align: center; display: none; }
@@ -65,7 +69,10 @@
     <div class="main-section">
         <h2>🇫🇷 法语生成器</h2>
         <textarea id="textInput" placeholder="输入法语内容..."></textarea>
-        <button id="generateBtn" class="btn-generate" onclick="generateAudio()">生成语音</button>
+        <div class="btn-row">
+            <button id="generateBtn" class="btn-generate" onclick="generateAudio()">生成语音</button>
+            <button class="btn-forvo" onclick="openForvo()">forvo</button>
+        </div>
 
         <div id="playerBox" class="player-box">
             <div id="currentText" class="current-text"></div>
@@ -275,6 +282,13 @@
             wrapperDiv.appendChild(delBtn);
             listDiv.appendChild(wrapperDiv);
         });
+    }
+    // ====== forvo 搜索跳转 ======
+    function openForvo() {
+        const text = document.getElementById("textInput").value.trim();
+        if (!text) { alert("请输入内容"); return; }
+        const encoded = encodeURIComponent(text);
+        window.open(`https://forvo.com/search/${encoded}/`, '_blank');
     }
 </script>
 </body>
