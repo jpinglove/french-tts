@@ -11,12 +11,24 @@
         /* 顶部输入与播放区 */
         .main-section { padding: 20px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
         textarea { width: 100%; height: 80px; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
-        .btn-generate { width: 100%; padding: 15px; font-size: 18px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .btn-generate:disabled { background-color: #aaa; }
+        
+        /* 按钮行布局调整：40% / 20% / 20% / 20% */
         .btn-row { display: flex; gap: 8px; }
-        .btn-row .btn-generate { flex: 1; width: auto; }
-        .btn-forvo { width: 20%; min-width: 70px; padding: 15px 5px; font-size: 15px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; white-space: nowrap; }
-        .btn-forvo:hover { background-color: #5a6268; }
+        .btn-generate { width: 40%; padding: 15px; font-size: 18px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-generate:disabled { background-color: #aaa; }
+        
+        /* 三个外部工具小按钮的公共样式 */
+        .btn-ext { width: 20%; padding: 15px 2px; font-size: 15px; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; white-space: nowrap; }
+        
+        /* 各个小按钮的专属颜色与 Hover 状态 */
+        .btn-forvo { background-color: #17a2b8; }
+        .btn-forvo:hover { background-color: #138496; }
+        
+        .btn-dict { background-color: #fd7e14; }
+        .btn-dict:hover { background-color: #e46a05; }
+        
+        .btn-wd { background-color: #6f42c1; }
+        .btn-wd:hover { background-color: #59359a; }
         
         /* 播放器控制区 */
         .player-box { margin-top: 20px; text-align: center; display: none; }
@@ -32,7 +44,7 @@
         
         /* 语速显示区调整 */
         .speed-display { font-size: 16px; font-weight: bold; min-width: 50px; }
-        /* 新增：重置语速小按钮样式 */
+        /* 重置语速小按钮样式 */
         .reset-speed-btn { background: none; border: none; color: #007bff; font-size: 14px; cursor: pointer; padding: 0 0 0 10px; outline: none; }
         .reset-speed-btn:hover { text-decoration: underline; }
 
@@ -71,7 +83,9 @@
         <textarea id="textInput" placeholder="输入法语内容..."></textarea>
         <div class="btn-row">
             <button id="generateBtn" class="btn-generate" onclick="generateAudio()">生成语音</button>
-            <button class="btn-forvo" onclick="openForvo()">forvo</button>
+            <button class="btn-ext btn-forvo" onclick="openForvo()">forvo</button>
+            <button class="btn-ext btn-dict" onclick="openDict()">Dict</button>
+            <button class="btn-ext btn-wd" onclick="openWordReference()">wdRef</button>
         </div>
 
         <div id="playerBox" class="player-box">
@@ -289,6 +303,22 @@
         if (!text) { alert("请输入内容"); return; }
         const encoded = encodeURIComponent(text);
         window.open(`https://forvo.com/search/${encoded}/`, '_blank');
+    }
+
+    // ====== 新增：Dict 词典搜索跳转 ======
+    function openDict() {
+        const text = document.getElementById("textInput").value.trim();
+        if (!text) { alert("请输入内容"); return; }
+        const encoded = encodeURIComponent(text);
+        window.open(`https://www.frenchdictionary.com/translate/${encoded}`, '_blank');
+    }
+
+    // ====== 新增：WordReference 法汉词典搜索跳转 ======
+    function openWordReference() {
+        const text = document.getElementById("textInput").value.trim();
+        if (!text) { alert("请输入内容"); return; }
+        const encoded = encodeURIComponent(text);
+        window.open(`https://www.wordreference.com/frzh/${encoded}`, '_blank');
     }
 </script>
 </body>
