@@ -72,7 +72,7 @@ app.py 启动 → Pronouncer.load(data/pronounce.db)（一次性载入内存）
 | `tests/test_pronounce_engine.py` | 新增 | 引擎单元测试 |
 | `tests/test_pronounce_api.py` | 新增 | API 测试 |
 | `tests/test_regression_f4.py` | 新增 | 源文件例词自动回归 |
-| `requirements.txt` | 修改 | 补充 `python-dotenv`（`app.py` 已 import 但缺失，属既有缺陷修复） |
+| `pyproject.toml` / `poetry.lock` / `poetry.toml` | 依赖管理 | 项目由 poetry 管理；`app.py` 依赖的 `dotenv` 模块由 `dotenv` 包（依赖 `python-dotenv`）提供 |
 | `docs/french.txt` | 纳入版本库 | 文件内容不修改 |
 
 ---

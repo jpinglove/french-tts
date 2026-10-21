@@ -45,10 +45,19 @@ sudo apt update
 sudo apt install -y python3 python3-venv python3-pip nginx git curl
 ```
 
+安装 Poetry（项目依赖统一由其管理）：
+
+```bash
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+将 `~/.local/bin` 加入 `PATH`（若尚未加入），使 `poetry` 命令可用。
+
 验证：
 
 ```bash
 python3 --version    # 应显示 Python 3.11.x
+poetry --version
 nginx -v
 ```
 
@@ -68,7 +77,9 @@ cd /srv/french-tts
 app.py
 pronounce_engine.py
 build_pronounce_db.py
-requirements.txt
+pyproject.toml
+poetry.lock
+poetry.toml
 templates/index.html
 docs/french.txt          ← 构建拼读库的源数据，必须存在
 docs/pronunciation-design.md
@@ -77,30 +88,57 @@ docs/deployment-debian12.md
 
 > `docs/french.txt` 是拼读数据库的源文件，务必纳入部署。`data/pronounce.db` 不入版本库，需要在服务器上构建。
 
-## 5. 创建虚拟环境并安装依赖
+## 5. 用 Poetry 安装依赖
 
 ```bash
 cd /srv/french-tts
-python3 -m venv .venv
-.venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r requirements.txt
+poetry install
 ```
 
-`requirements.txt` 内容：
+依赖声明在 `pyproject.toml` 中，精确版本锁定在 `poetry.lock`：
 
+```toml
+[project]
+dependencies = [
+    "Flask==3.0.0",
+    "azure-cognitiveservices-speech==1.34.0",
+    "gunicorn==21.2.0",
+    "dotenv>=0.9.9,<0.10.0",
+]
 ```
-Flask==3.0.0
-azure-cognitiveservices-speech==1.34.0
-gunicorn==21.2.0
-python-dotenv==1.0.1
-```
 
-> 注意：`python-dotenv` 是 `app.py` 读取 `.env` 所必需的依赖。旧版本依赖清单遗漏了它，会导致启动报 `ModuleNotFoundError: No module named 'dotenv'`。
+> 注意：`dotenv` 是 `app.py` 读取 `.env` 所必需的依赖。它本身是一个很薄的兼容包（PyPI 上标注为 deprecated），并依赖 `python-dotenv`；`poetry.lock` 中实际锁定的 `python-dotenv` 为 1.0.1，与旧环境行为一致。
 
-若服务器访问 PyPI 较慢，可先用国内镜像：
+`poetry.toml` 中设置了 `virtualenvs.in-project = true`，虚拟环境创建在项目内的 `.venv/`，与下文 systemd 的 `ExecStart` 路径一致。
+
+### 5.1 旧部署机迁移
+
+旧部署机上的 `pyproject.toml`、`poetry.lock` 从未纳入版本库，与本仓库的配置不一致。直接 `git pull` 后旧锁文件会让 poetry 拒绝安装（提示 `pyproject.toml changed significantly since poetry.lock was last generated`）。迁移步骤：
 
 ```bash
-.venv/bin/pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+cd /srv/french-tts
+sudo -u frenchtts git pull
+sudo -u frenchtts rm -f pyproject.toml poetry.lock
+sudo -u frenchtts git checkout -- pyproject.toml poetry.lock   # 以仓库版本为准
+sudo -u frenchtts poetry install
+sudo systemctl restart french-tts
+```
+
+- 不要手动合并两份配置：新配置与旧配置的依赖集合一致（`dotenv` 0.9.9 会带入 `python-dotenv`，锁定的仍是 1.0.1），以仓库版本为准即可。
+- `poetry install` 只安装锁定包、不删除多余包；旧环境即使残留额外包也不影响运行。若想彻底对齐，可改用 `poetry sync`。
+
+新增依赖使用：
+
+```bash
+poetry add <包名>
+```
+
+若服务器访问 PyPI 较慢，可先为 poetry 配置国内镜像源：
+
+```bash
+poetry source add --priority=primary tuna https://pypi.tuna.tsinghua.edu.cn/simple
+poetry lock
+poetry install
 ```
 
 ## 6. 构建拼读规则数据库
@@ -268,7 +306,7 @@ Gunicorn 只监听 `127.0.0.1:5000`，无需对外开放。
 ```bash
 cd /srv/french-tts
 sudo -u frenchtts git pull
-sudo -u frenchtts .venv/bin/pip install -r requirements.txt       # 依赖有变化时
+sudo -u frenchtts poetry install                                   # 依赖有变化时
 sudo -u frenchtts .venv/bin/python build_pronounce_db.py           # 规则有变化时必须执行
 sudo -u frenchtts .venv/bin/python -m unittest discover -s tests   # 可选：跑测试
 sudo systemctl restart french-tts
@@ -294,7 +332,7 @@ sudo -u frenchtts tar czf /var/backups/french-tts-$(date +%F).tar.gz \
 
 | 现象 | 原因与处理 |
 |---|---|
-| 启动报 `No module named 'dotenv'` | 依赖未装全，执行 `.venv/bin/pip install -r requirements.txt` |
+| 启动报 `No module named 'dotenv'` | 依赖未装全，执行 `poetry install` |
 | 拼读接口返回 503 | `data/pronounce.db` 不存在，执行 `.venv/bin/python build_pronounce_db.py` |
 | 构建脚本报“未识别的源条件” | `docs/french.txt` 被改动或版本不匹配，恢复源文件后重建 |
 | 回归未达到 119/119 | 规则或例外词被修改未同步，按 `docs/pronunciation-design.md` 检查 |
