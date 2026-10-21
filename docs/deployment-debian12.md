@@ -90,6 +90,8 @@ docs/deployment-debian12.md
 
 ## 5. 用 Poetry 安装依赖
 
+> 本节的示例路径为 `/srv/french-tts`；若实际部署在 `/var/www/french-tts` 等其他目录，请相应替换。
+
 ```bash
 cd /srv/french-tts
 poetry install
@@ -143,6 +145,41 @@ poetry source add --priority=primary tuna https://pypi.tuna.tsinghua.edu.cn/simp
 poetry lock
 poetry install
 ```
+
+### 5.2 手动上传的目录转为 git 仓库（保留现有代码与数据）
+
+适用于代码是手动上传、目录中已有 `history.db`、`static/audio/`、`data/pronounce.db` 等运行数据的情况（例如 `/var/www/french-tts`）。核心思路：**不删除目录，只在原地 `git init` 并让工作区对齐到远程 `main`**。`.gitignore` 已排除 `static/`、`history.db`、`data/*.db`、`.env`、`.venv`、`__pycache__`，这些文件不会被 git 触碰。
+
+```bash
+cd /var/www/french-tts
+
+# 0) 先做全目录备份
+sudo tar czf /var/backups/french-tts-before-git-$(date +%F).tar.gz -C /var/www french-tts
+
+# 1) 初始化仓库并关联远程（SSH 未配置时可用 https://github.com/jpinglove/french-tts.git）
+git init -b main
+git remote add origin git@github.com:jpinglove/french-tts.git
+git fetch origin
+
+# 2) 查看哪些本地文件将被仓库版本替换（应当只有旧代码，数据文件不会出现在列表里）
+git ls-tree -r --name-only origin/main | while read -r f; do [ -f "$f" ] && echo "将被替换: $f"; done
+
+# 3) 就地对齐到远程 main
+git reset --hard origin/main
+git branch --set-upstream-to=origin/main main
+
+# 4) 验证
+git status                        # 应为 clean
+git log --oneline -3              # 应看到远端最新提交
+```
+
+要点：
+
+- `git reset --hard origin/main` 只会覆盖**仓库跟踪的路径**（`app.py`、`templates/`、`pyproject.toml` 等），`history.db`、`static/`、`data/pronounce.db`、`.env`、`.venv`、`reload_fr_en_tts.sh` 等非跟踪文件原样保留。
+- 目录里旧的 `requirements.txt` 不在新仓库中，不会被自动删除，可手动 `rm -f requirements.txt`。
+- 不要用 `git add -A && git commit` 把旧代码提交进本地历史，否则会与远程历史分叉、产生 unrelated histories。
+- 如果以 root 操作而目录属主是其他用户，git 可能提示 `detected dubious ownership`，先执行 `git config --global --add safe.directory /var/www/french-tts`。
+- 之后按第 6、9 节继续：`poetry install` → 构建拼读库 → 重启服务。若 `.venv` 已有旧环境，poetry 会直接复用；若报错则 `rm -rf .venv` 后重新 `poetry install`。
 
 ## 6. 构建拼读规则数据库
 
