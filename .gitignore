@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# 拼读规则数据库（由 build_pronounce_db.py 生成，部署时重建）
+data/*.db
+data/*.db.tmp
+
+# 运行期生成文件（音频与历史数据库）
+static/
+history.db
+
+# Python 缓存
+__pycache__/
+*.py[cod]

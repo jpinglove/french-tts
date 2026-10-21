@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import sqlite3
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template
 import azure.cognitiveservices.speech as speechsdk
+
+from pronounce_engine import Pronouncer, norm_text
 
 app = Flask(__name__)
 
@@ -20,7 +23,17 @@ SPEAKING_RATE = "-25%"
 AUDIO_DIR = os.path.join(app.root_path, 'static', 'audio')
 os.makedirs(AUDIO_DIR, exist_ok=True)
 DB_FILE = os.path.join(app.root_path, 'history.db')
+PRONOUNCE_DB = os.path.join(app.root_path, 'data', 'pronounce.db')
+PRONOUNCE_MAX_LEN = 200
+PRONOUNCE_INPUT_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿŒœÆæ'’\-\s]+$")
 # ===============================================
+
+# 拼读引擎：启动时把规则库载入内存；数据库缺失不影响语音合成功能
+pronouncer = Pronouncer(PRONOUNCE_DB)
+try:
+    pronouncer.load()
+except FileNotFoundError as exc:
+    app.logger.warning('%s', exc)
 
 def init_db():
     """初始化数据库表"""
@@ -96,6 +109,26 @@ def generate():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/pronounce', methods=['POST'])
+def pronounce():
+    """查询本地拼读规则，返回音标与逐条应用的拼写规则。"""
+    data = request.get_json(silent=True) or {}
+    text = norm_text(data.get('text', ''))
+    if not text:
+        return jsonify({'error': '请输入法语单词或短语'}), 400
+    if len(text) > PRONOUNCE_MAX_LEN:
+        return jsonify({'error': f'输入过长（最多 {PRONOUNCE_MAX_LEN} 个字符）'}), 400
+    if not PRONOUNCE_INPUT_RE.match(text):
+        return jsonify({'error': '请输入法语单词（仅支持字母、撇号、连字符和空格）'}), 400
+    if not pronouncer.loaded:
+        return jsonify({'error': '拼读数据库未构建，请先在服务器运行 python3 build_pronounce_db.py'}), 503
+    try:
+        return jsonify(pronouncer.pronounce(text))
+    except Exception as e:
+        app.logger.exception('拼读失败')
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/history', methods=['GET'])
 def get_history():

@@ -12,26 +12,52 @@
         .main-section { padding: 20px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
         textarea { width: 100%; height: 80px; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; resize: none; margin-bottom: 10px; }
         
-        /* 按钮行布局调整：30% / 17.5% / 17.5% / 17.5% / 17.5% */
+        /* 按钮行：语音 1.4 份，其余 5 个按钮各 1 份 */
         .btn-row { display: flex; gap: 6px; }
-        .btn-generate { width: 30%; padding: 15px 2px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; }
+        .btn-generate { flex: 1.4; padding: 15px 2px; font-size: clamp(13px, 1.6vw, 16px); background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; white-space: nowrap; transition: background-color 0.15s; }
+        .btn-generate:hover { background-color: #0056b3; }
         .btn-generate:disabled { background-color: #aaa; }
-        
-        /* 四个外部工具小按钮的公共样式 */
-        .btn-ext { width: 17.5%; padding: 15px 2px; font-size: 14px; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; white-space: nowrap; }
-        
+
+        /* 五个小按钮的公共样式 */
+        .btn-ext { flex: 1; padding: 15px 2px; font-size: clamp(11px, 1.4vw, 14px); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; text-align: center; white-space: nowrap; transition: background-color 0.15s; }
+        .btn-ext:disabled { opacity: 0.65; cursor: wait; }
+
         /* 各个小按钮的专属颜色与 Hover 状态 */
+        .btn-pronounce { background-color: #d63384; }
+        .btn-pronounce:hover { background-color: #b02a6c; }
+
         .btn-forvo { background-color: #17a2b8; }
         .btn-forvo:hover { background-color: #138496; }
-        
+
         .btn-dict { background-color: #fd7e14; }
         .btn-dict:hover { background-color: #e46a05; }
-        
+
         .btn-wd { background-color: #6f42c1; }
         .btn-wd:hover { background-color: #59359a; }
 
         .btn-frdic { background-color: #0f766e; }
         .btn-frdic:hover { background-color: #0d5f58; }
+
+        /* 拼读结果面板 */
+        .pronounce-box { display: none; margin-top: 16px; }
+        .pronounce-word { margin-bottom: 16px; }
+        .pronounce-word-head { text-align: center; margin-bottom: 10px; }
+        .pronounce-word-text { font-size: 18px; font-weight: 600; color: #555; word-break: break-word; }
+        .pronounce-ipa { font-family: "DejaVu Sans", "Noto Sans", "Segoe UI", sans-serif; font-size: 32px; font-weight: 700; color: #d63384; line-height: 1.35; margin-top: 2px; word-break: break-word; }
+        .pronounce-exception { text-align: center; font-size: 13px; color: #888; margin-top: 3px; }
+        .pronounce-loading { text-align: center; font-size: 14px; color: #888; padding: 8px; }
+        .pronounce-error { text-align: center; font-size: 14px; color: #dc3545; padding: 8px; }
+
+        /* 规则卡片：引用块样式 */
+        .rule-card { background: #fdf2f8; border-left: 4px solid #d63384; border-radius: 0 8px 8px 0; padding: 8px 12px; margin-bottom: 8px; }
+        .rule-card.silent { background: #f8f9fa; border-left-color: #adb5bd; }
+        .rule-card.unknown { background: #fff8e1; border-left-color: #f0ad4e; }
+        .rule-main { font-size: 15px; color: #333; }
+        .rule-main b { color: #c2185b; }
+        .rule-ipa { font-family: "DejaVu Sans", "Noto Sans", "Segoe UI", sans-serif; font-weight: 700; color: #c2185b; }
+        .rule-card.silent .rule-ipa, .rule-card.unknown .rule-ipa { color: #6c757d; }
+        .rule-meta { font-size: 12px; color: #777; margin-top: 3px; line-height: 1.5; }
+        .rule-source { font-size: 11px; color: #9a9a9a; margin-top: 2px; }
         
         /* 播放器控制区 */
         .player-box { margin-top: 20px; text-align: center; display: none; }
@@ -85,11 +111,16 @@
         <h2>🇫🇷 法语生成器</h2>
         <textarea id="textInput" placeholder="输入法语内容..."></textarea>
         <div class="btn-row">
-            <button id="generateBtn" class="btn-generate" onclick="generateAudio()">生成语音</button>
+            <button id="generateBtn" class="btn-generate" onclick="generateAudio()">语音</button>
+            <button id="pronounceBtn" class="btn-ext btn-pronounce" onclick="pronounceText()">拼读</button>
             <button class="btn-ext btn-forvo" onclick="openForvo()">forvo</button>
             <button class="btn-ext btn-dict" onclick="openDict()">Dict</button>
             <button class="btn-ext btn-wd" onclick="openWordReference()">wdRef</button>
             <button class="btn-ext btn-frdic" onclick="openFrDic()">frDic</button>
+        </div>
+
+        <div id="pronounceBox" class="pronounce-box">
+            <div id="pronounceContent"></div>
         </div>
 
         <div id="playerBox" class="player-box">
@@ -160,7 +191,7 @@
             alert("生成失败: " + e.message);
         } finally {
             btn.disabled = false;
-            btn.innerText = "生成语音";
+            btn.innerText = "语音";
         }
     }
 
@@ -301,6 +332,109 @@
             listDiv.appendChild(wrapperDiv);
         });
     }
+    // ====== 拼读：查询本地拼读规则库 ======
+    async function pronounceText() {
+        const text = document.getElementById("textInput").value.trim();
+        if (!text) { alert("请输入内容"); return; }
+
+        const btn = document.getElementById("pronounceBtn");
+        const box = document.getElementById("pronounceBox");
+        const content = document.getElementById("pronounceContent");
+        box.style.display = "block";
+        btn.disabled = true;
+        btn.innerText = "查询中...";
+        content.replaceChildren(makeEl("div", "pronounce-loading", "正在查询拼读规则..."));
+
+        try {
+            const res = await fetch('/pronounce', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || "查询失败");
+            renderPronounce(data);
+        } catch (e) {
+            content.replaceChildren(makeEl("div", "pronounce-error", "拼读失败：" + e.message));
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "拼读";
+        }
+    }
+
+    function makeEl(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+    }
+
+    function renderPronounce(data) {
+        const content = document.getElementById("pronounceContent");
+        content.replaceChildren();
+
+        data.words.forEach(word => {
+            const block = makeEl("div", "pronounce-word");
+            const head = makeEl("div", "pronounce-word-head");
+            head.appendChild(makeEl("div", "pronounce-word-text", word.display));
+            head.appendChild(makeEl("div", "pronounce-ipa", word.ipa || "—"));
+            if (word.exception) {
+                head.appendChild(makeEl("div", "pronounce-exception", "例外词：" + word.exception));
+            }
+            block.appendChild(head);
+
+            word.segments.forEach(seg => {
+                block.appendChild(buildRuleCard(seg));
+            });
+            content.appendChild(block);
+        });
+
+        if (!data.complete) {
+            content.appendChild(makeEl("div", "pronounce-error",
+                "部分字母不在规则库中，已用「未识别」标出。"));
+        }
+    }
+
+    const SOURCE_LABELS = {
+        "french.txt": "french.txt 规则",
+        "supplement": "补充规则",
+        "exception": "例外词表"
+    };
+
+    function buildRuleCard(seg) {
+        if (seg.status === "separator") {
+            const sep = makeEl("div", "rule-card silent");
+            const line = makeEl("div", "rule-main");
+            line.appendChild(makeEl("b", null, seg.grapheme));
+            line.appendChild(document.createTextNode(" → 分隔符（不发音）"));
+            sep.appendChild(line);
+            return sep;
+        }
+        const card = makeEl("div", "rule-card");
+        if (seg.status === "silent") card.classList.add("silent");
+        if (seg.status === "unknown") card.classList.add("unknown");
+
+        const main = makeEl("div", "rule-main");
+        main.appendChild(makeEl("b", null, seg.grapheme));
+        main.appendChild(document.createTextNode(" → "));
+        main.appendChild(makeEl("span", "rule-ipa", seg.display));
+        card.appendChild(main);
+
+        if (seg.spellings && seg.spellings.length > 0) {
+            card.appendChild(makeEl("div", "rule-meta",
+                "拼写规则：" + seg.spellings.join(", ")));
+        }
+        if (seg.condition_desc) {
+            card.appendChild(makeEl("div", "rule-meta", "条件：" + seg.condition_desc));
+        }
+        if (seg.source) {
+            let source = "来源：" + (SOURCE_LABELS[seg.source] || seg.source);
+            if (seg.phoneme) source += " · 音素 [" + seg.phoneme + "]";
+            card.appendChild(makeEl("div", "rule-source", source));
+        }
+        return card;
+    }
+
     // ====== forvo 搜索跳转 ======
     function openForvo() {
         const text = document.getElementById("textInput").value.trim();
