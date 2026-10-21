@@ -113,17 +113,20 @@ dependencies = [
 
 ### 5.1 旧部署机迁移
 
-旧部署机上的 `pyproject.toml`、`poetry.lock` 从未纳入版本库，与本仓库的配置不一致。直接 `git pull` 后旧锁文件会让 poetry 拒绝安装（提示 `pyproject.toml changed significantly since poetry.lock was last generated`）。迁移步骤：
+旧部署机上的 `pyproject.toml`、`poetry.lock` 从未纳入版本库，与本仓库的配置不一致，且会**阻止 `git pull`**（报 `The following untracked working tree files would be overwritten by merge: ... Aborting`）；即使强行拉取成功，旧锁文件也会让 poetry 拒绝安装（提示 `pyproject.toml changed significantly since poetry.lock was last generated`）。因此必须**先删除、再拉取**：
 
 ```bash
 cd /srv/french-tts
+sudo -u frenchtts rm -f pyproject.toml poetry.lock   # 必须先删，否则 pull 会中止
+sudo -u frenchtts rm -rf __pycache__
 sudo -u frenchtts git pull
-sudo -u frenchtts rm -f pyproject.toml poetry.lock
-sudo -u frenchtts git checkout -- pyproject.toml poetry.lock   # 以仓库版本为准
 sudo -u frenchtts poetry install
+sudo -u frenchtts .venv/bin/python build_pronounce_db.py
+sudo -u frenchtts .venv/bin/python -m unittest discover -s tests
 sudo systemctl restart french-tts
 ```
 
+- `requirements.txt` 是仓库跟踪文件，`git pull` 会自动删除，无需手动处理；`history.db`、`static/`、`.env`、`reload_fr_en_tts.sh` 均为本地文件，不受 pull 影响，不要删除。
 - 不要手动合并两份配置：新配置与旧配置的依赖集合一致（`dotenv` 0.9.9 会带入 `python-dotenv`，锁定的仍是 1.0.1），以仓库版本为准即可。
 - `poetry install` 只安装锁定包、不删除多余包；旧环境即使残留额外包也不影响运行。若想彻底对齐，可改用 `poetry sync`。
 
