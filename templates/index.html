@@ -68,7 +68,14 @@
         .history-text { font-size: 16px; margin-bottom: 5px; word-break: break-word; }
         .history-time { font-size: 12px; color: #888; }
         
-        .delete-btn { font-size: 16px; color: #dc3545; cursor: pointer; padding: 10px; margin-left: 10px; border-radius: 5px; user-select: none; }
+        /* 历史记录右侧操作按钮区 */
+        .history-actions { display: flex; align-items: center; gap: 5px; margin-left: 10px; }
+        
+        /* 新增：复制按钮样式 */
+        .copy-btn { font-size: 16px; cursor: pointer; padding: 10px; border-radius: 5px; user-select: none; transition: background 0.2s; display: flex; align-items: center; justify-content: center; width: 24px; }
+        .copy-btn:hover { background-color: #e9ecef; }
+
+        .delete-btn { font-size: 16px; color: #dc3545; cursor: pointer; padding: 10px; border-radius: 5px; user-select: none; transition: background 0.2s; display: flex; align-items: center; justify-content: center; width: 24px; }
         .delete-btn:hover { background-color: #ffe6e6; }
         
         @media (min-width: 768px) {
@@ -216,6 +223,27 @@
         document.getElementById("speedDisplay").innerText = "当前语速: 1.00x";
     }
 
+    // ====== 新增：历史记录单条复制功能 ======
+    async function copyHistoryText(text, btnElement, event) {
+        event.stopPropagation(); // 防止触发整行的播放事件
+        
+        try {
+            await navigator.clipboard.writeText(text);
+            
+            // 将按钮变成绿色对勾作为反馈
+            const originalText = btnElement.innerText;
+            btnElement.innerText = "✅";
+            
+            // 2秒后恢复成复制面板图标
+            setTimeout(() => {
+                btnElement.innerText = originalText;
+            }, 2000);
+            
+        } catch (err) {
+            alert("复制失败，请检查浏览器权限。");
+        }
+    }
+
     async function deleteRecord(id, event) {
         // 防止点击删除时触发父级容器的播放事件
         event.stopPropagation();
@@ -290,14 +318,30 @@
             `;
             contentDiv.onclick = () => loadAudio(item.text, item.url);
             
-            // 右侧按钮区：只负责删除
+            // 右侧按钮区容器：包含复制和删除按钮
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "history-actions";
+
+            // 复制按钮 📋
+            const copyBtn = document.createElement("div");
+            copyBtn.className = "copy-btn";
+            copyBtn.innerText = "📋";
+            copyBtn.title = "复制文本";
+            copyBtn.onclick = (e) => copyHistoryText(item.text, copyBtn, e);
+            
+            // 删除按钮 ❌
             const delBtn = document.createElement("div");
             delBtn.className = "delete-btn";
             delBtn.innerText = "❌";
+            delBtn.title = "删除记录";
             delBtn.onclick = (e) => deleteRecord(item.id, e);
             
+            // 将复制和删除按顺序放入容器
+            actionsDiv.appendChild(copyBtn);
+            actionsDiv.appendChild(delBtn);
+
             wrapperDiv.appendChild(contentDiv);
-            wrapperDiv.appendChild(delBtn);
+            wrapperDiv.appendChild(actionsDiv);
             listDiv.appendChild(wrapperDiv);
         });
     }
