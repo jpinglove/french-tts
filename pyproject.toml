@@ -1,0 +1,23 @@
+[project]
+name = "french-tts"
+version = "0.1.0"
+description = "法语发音助手：Azure 语音合成 + 本地拼读规则查询"
+authors = [
+    { name = "jpinglove", email = "jpinglove@gmail.com" }
+]
+readme = "docs/pronunciation-design.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "Flask==3.0.0",
+    "azure-cognitiveservices-speech==1.34.0",
+    "gunicorn==21.2.0",
+    "dotenv>=0.9.9,<0.10.0",
+]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
