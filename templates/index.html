@@ -254,27 +254,60 @@
         document.getElementById("speedDisplay").innerText = "当前语速: 1.00x";
     }
 
-    // ====== 新增：历史记录单条复制功能 ======
+    // ====== 新增：历史记录单条复制功能（兼容 HTTP 环境） ======
     async function copyHistoryText(text, btnElement, event) {
         event.stopPropagation(); // 防止触发整行的播放事件
         
-        try {
-            await navigator.clipboard.writeText(text);
-            
-            // 将按钮变成绿色对勾作为反馈
+        let copySuccess = false;
+
+        // 方案 1：尝试使用现代 Clipboard API (仅限 HTTPS 环境)
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text);
+                copySuccess = true;
+            } catch (err) {
+                console.warn("现代剪贴板 API 失败，尝试备用方案...", err);
+            }
+        }
+
+        // 方案 2：如果方案 1 失败（通常是因为 HTTP 环境），使用传统隐藏输入框法
+        if (!copySuccess) {
+            try {
+                // 动态创建一个隐藏的 textarea
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                
+                // 防止页面因为插入元素而发生滚动跳跃
+                textArea.style.position = "fixed";
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.opacity = "0";
+                
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                // 执行传统复制命令
+                copySuccess = document.execCommand('copy');
+                document.body.removeChild(textArea); // 阅后即焚
+            } catch (err) {
+                console.error("备用复制方案也失败了", err);
+            }
+        }
+
+        // 反馈动画
+        if (copySuccess) {
             const originalText = btnElement.innerText;
             btnElement.innerText = "✅";
-            
             // 2秒后恢复成复制面板图标
             setTimeout(() => {
                 btnElement.innerText = originalText;
             }, 2000);
-            
-        } catch (err) {
-            alert("复制失败，请检查浏览器权限。");
+        } else {
+            alert("复制失败，您的浏览器不支持或拦截了此操作，请手动选中复制。");
         }
     }
-
+	
     async function deleteRecord(id, event) {
         // 防止点击删除时触发父级容器的播放事件
         event.stopPropagation();
